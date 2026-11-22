@@ -1,7 +1,7 @@
-# @switchboard-si/harnessrouter-paperclip-adapter
+# @switchboard/harness-adapter
 
-[![CI](https://github.com/Switchboard-SI/harnessrouter-paperclip-adapter/actions/workflows/ci.yml/badge.svg)](https://github.com/Switchboard-SI/harnessrouter-paperclip-adapter/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/@switchboard-si/harnessrouter-paperclip-adapter.svg)](https://www.npmjs.com/package/@switchboard-si/harnessrouter-paperclip-adapter)
+[![CI](https://github.com/Switchboard-SI/harness-adapter/actions/workflows/ci.yml/badge.svg)](https://github.com/Switchboard-SI/harness-adapter/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/@switchboard/harness-adapter.svg)](https://www.npmjs.com/package/@switchboard/harness-adapter)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-green.svg)](https://nodejs.org)
 
@@ -9,7 +9,7 @@
 > [HarnessRouter](https://github.com/HarnessRouter/harnessrouter) over the Unified Harness Protocol
 > (UHP).
 
-[View the landing page →](https://switchboard-si.github.io/harnessrouter-paperclip-adapter/)
+[View the landing page →](https://switchboard-si.github.io/harness-adapter/)
 
 ---
 
@@ -33,7 +33,7 @@ execution contract — nothing more, nothing invented.
 ## Install
 
 ```bash
-npm install @switchboard-si/harnessrouter-paperclip-adapter
+npm install @switchboard/harness-adapter
 ```
 
 ## Requirements
@@ -89,7 +89,7 @@ Pass the config when registering the adapter with Paperclip:
 ## Using it in Paperclip
 
 ```ts
-import adapter from "@switchboard-si/harnessrouter-paperclip-adapter";
+import adapter from "@switchboard/harness-adapter";
 
 // Register `adapter` alongside Paperclip's built-in adapters.
 // Its `type` is "harnessrouter".
@@ -104,8 +104,8 @@ to validate configuration before accepting runs.
 ## Development
 
 ```bash
-git clone https://github.com/Switchboard-SI/harnessrouter-paperclip-adapter.git
-cd harnessrouter-paperclip-adapter
+git clone https://github.com/Switchboard-SI/harness-adapter.git
+cd harness-adapter
 npm install
 npm test        # 55 tests, no network or Docker required
 npm run typecheck
