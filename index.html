@@ -850,7 +850,8 @@
       <div class="hero-grid">
         <div class="hero-copy">
           <div class="kicker hero-anim"><span class="dot" aria-hidden="true"></span>Open source · Apache-2.0</div>
-          <h1 class="hero-anim">Code-driven agents,<br /><span class="accent">straight onto UHP.</span></h1>
+          <h1 class="hero-anim">Paperclip runs.<br /><span class="accent">HarnessRouter executes.</span></h1>
+          <p class="hero-sub hero-anim">An adapter, not another control plane.</p>
           <p class="hero-sub hero-anim">
             A Paperclip <code>ServerAdapterModule</code> that runs agents on HarnessRouter over the
             Unified Harness Protocol. One Paperclip run, one UHP task — with conversation
@@ -886,7 +887,8 @@
       </div>
 
       <div class="stats reveal">
-        <div class="stat"><strong>55</strong><span>tests passing</span></div>
+        <div class="stat"><strong>55</strong><span>tests passing (vitest)</span></div>
+        <div class="stat"><strong>0</strong><span>TypeScript errors (tsc --noEmit)</span></div>
         <div class="stat"><strong>3</strong><span>read-only startup probes</span></div>
         <div class="stat"><strong>1:1</strong><span>Paperclip run → UHP task</span></div>
         <div class="stat"><strong>0</strong><span>retries after first event</span></div>
@@ -973,6 +975,38 @@
     </div>
   </section>
 
+  <!-- ============ Why not built-in adapters? ============ -->
+  <section id="why-not-builtin" class="section section-surface">
+    <div class="container">
+      <div class="section-head reveal">
+        <h2>Why not Paperclip's built-in adapters?</h2>
+        <p>Paperclip ships OpenAI, Anthropic, and generic HTTP adapters. This one exists for HarnessRouter because:</p>
+      </div>
+      <div class="cards">
+        <article class="card reveal">
+          <div class="card-icon" aria-hidden="true">🔀</div>
+          <h3>Multi-harness gateway</h3>
+          <p>One endpoint routes to Codex, Claude Code, Hermes, Aider, OpenHands. The adapter encodes that routing (<code>harnessId</code>) plus UHP semantics: streaming, <code>previous_response_id</code>, idempotency keys, usage, error envelopes.</p>
+        </article>
+        <article class="card reveal">
+          <div class="card-icon" aria-hidden="true">📡</div>
+          <h3>UHP ≠ Responses API</h3>
+          <p>UHP has its own event stream (<code>response.output_text.delta</code>, <code>response.completed</code>, error envelopes with <code>retryable</code>), cancellation (<code>DELETE /v1/responses/{id}</code>), and stored-response recovery (<code>GET /v1/responses/{id}</code>). The adapter maps these 1:1 to Paperclip's contract.</p>
+        </article>
+        <article class="card reveal">
+          <div class="card-icon" aria-hidden="true">🔐</div>
+          <h3>Operator ergonomics</h3>
+          <p>API keys live in a <code>chmod 600</code> file, never in Paperclip's DB or shell history. <code>testEnvironment</code> gives three green checks before a run starts.</p>
+        </article>
+        <article class="card reveal">
+          <div class="card-icon" aria-hidden="true">🖥️</div>
+          <h3>No UI duplication</h3>
+          <p>Paperclip owns Kanban, diff view, token meter, session history. This adapter does not ship a dashboard.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
   <!-- ============ Example ============ -->
   <section id="example" class="section">
     <div class="container">
@@ -1012,8 +1046,8 @@ adapter.<span class="f">execute</span>(ctx, {
   <section id="trace" class="section section-surface">
     <div class="container">
       <div class="section-head reveal">
-        <h2>Watch a run</h2>
-        <p>The adapter's four hand-offs, in the order Paperclip sees them.</p>
+        <h2>Wire-protocol illustration</h2>
+        <p>Not a product dashboard — a schematic of the adapter's four hand-offs in the order Paperclip sees them.</p>
       </div>
 
       <div class="trace-card reveal" id="trace-card">

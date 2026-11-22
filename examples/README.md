@@ -1,32 +1,56 @@
 # @switchboard/harness-adapter — Examples
 
-Integration examples showing how the adapter works with the motion/video/3d toolchain.
+Integration examples for the adapter and the optional tooling in `tools/`.
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `demo-run.ts` | Full adapter run → record terminal → render MP4 |
-| `motion-composition.ts` | Remotion composition using adapter output |
-| `three-dashboard.tsx` | Three.js 3D dashboard of agent runs |
+| `basic-usage.ts` | Minimal adapter run with config |
 
-## Demo: run → record → render
+## Basic usage
 
 ```ts
 import { createHarnessRouterAdapter } from "../dist/index.js";
-import { execSync } from "node:child_process";
-import fs from "node:fs";
 
-// 1. Run a task via the adapter
 const adapter = createHarnessRouterAdapter();
-const result = await adapter.execute(ctx);
+const result = await adapter.execute(ctx, {
+  baseUrl: "http://127.0.0.1:3200/api/harness",
+  apiKeyFile: "~/.harnessrouter/api-key",
+  harnessId: "codex",
+  timeoutSeconds: 900,
+});
 
-// 2. Record the terminal output as a video (OpenScreen/onetake style)
-// 3. Encode with FFmpeg (npm run video:encode)
-// 4. Composite with Remotion/HyperFrames
+console.log(result);
 ```
 
-## 3D dashboard
+## Optional tooling (not installed by default)
 
-Use `tools/3d/scene.js` to render a live 3D view of active agent runs,
-sessions, and token usage — updating over WebSocket from the adapter.
+The `tools/` directory contains standalone scripts for motion, video, 3D, and AI image generation. These are **not** dependencies of the adapter and are not required to run it.
+
+```bash
+# Motion (GSAP/Remotion)
+npm run motion:init      # scaffold a composition
+# npm run motion:render  # requires tools/motion/render.js (not included)
+
+# Video (FFmpeg)
+# npm run video:encode   # requires tools/video/encode.js (not included)
+# npm run video:compositing  # requires tools/video/compositing.js (not included)
+
+# 3D (Three.js/Blender)
+# npm run 3d:scene       # requires tools/3d/scene.js (not included)
+
+# AI Image (ComfyUI)
+# npm run ai:image       # requires tools/ai-image/generate.js (not included)
+
+# Agent desktop (Hermes)
+# npm run agent:desktop  # requires tools/agent-ui/hermes.js (not included)
+```
+
+To use any of the `tools/` scripts, install their dependencies first:
+
+```bash
+bash tools/setup-tools.sh
+```
+
+See `tools/README.md` for details.
