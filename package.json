@@ -23,7 +23,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "devDependencies": {
-    "@paperclipai/adapter-utils": "^2026.1106.0",
+    "@paperclipai/adapter-utils": "^2026.1117.0",
     "@types/node": "^26.6.6",
     "typescript": "^7.0.2",
     "vitest": "^4.1.12"
