@@ -1,0 +1,8 @@
+{
+  "composition": "harness-adapter-demo",
+  "output": "video",
+  "format": "mp4",
+  "fps": 30,
+  "resolution": [1920, 1080],
+  "template": "terminal-preview"
+}

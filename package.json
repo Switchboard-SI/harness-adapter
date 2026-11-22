@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@switchboard/harness-adapter",
+  "version": "0.1.0",
+  "description": "Paperclip ServerAdapterModule that runs agents on HarnessRouter over UHP, with integrated motion/video toolchain.",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "smoke": "node scripts/smoke.mjs",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "motion:init": "node tools/motion/init.js",
+    "motion:render": "node tools/motion/render.js",
+    "video:encode": "node tools/video/encode.js",
+    "video:compositing": "node tools/video/compositing.js",
+    "3d:scene": "node tools/3d/scene.js",
+    "ai:image": "node tools/ai-image/generate.js",
+    "agent:desktop": "node tools/agent-ui/hermes.js",
+    "tools:setup": "bash tools/setup-tools.sh"
+  },
+  "keywords": [
+    "paperclip",
+    "harnessrouter",
+    "uhp",
+    "adapter",
+    "agents",
+    "motion",
+    "video",
+    "3d",
+    "remotion",
+    "gsap",
+    "threejs"
+  ],
+  "author": "Switchboard (https://switchboard-ai.com)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "devDependencies": {
+    "@paperclipai/adapter-utils": "^2026.1106.0",
+    "@types/node": "^26.6.6",
+    "typescript": "^5.9.0",
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "@types/fluent-ffmpeg": "^2.1.24",
+    "canvas": "^3.2.3",
+    "fluent-ffmpeg": "^2.1.3",
+    "gsap": "^3.12.7",
+    "harnessrouterjs": "0.1.0",
+    "remotion": "^4.0.0",
+    "three": "^0.172.0"
+  },
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "tools",
+    "examples"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Switchboard-SI/harness-adapter.git"
+  },
+  "homepage": "https://github.com/Switchboard-SI/harness-adapter#readme",
+  "bugs": {
+    "url": "https://github.com/Switchboard-SI/harness-adapter/issues"
+  },
+  "peerDependencies": {
+    "@paperclipai/adapter-utils": "*"
+  },
+  "peerDependenciesMeta": {
+    "@paperclipai/adapter-utils": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

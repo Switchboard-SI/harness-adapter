@@ -1,0 +1,310 @@
+import { afterEach, describe, expect, it } from "vitest";
+import type { AdapterExecutionContext, AdapterRuntimeEvent } from "@paperclipai/adapter-utils";
+
+import { createHarnessRouterAdapter, type AdapterDependencies } from "../src/adapter.js";
+import type { ReadFile } from "../src/secrets.js";
+import { startMockUhp, type MockUhp } from "./mock-uhp.js";
+
+let mock: MockUhp | null = null;
+
+afterEach(async () => {
+  await mock?.close();
+  mock = null;
+});
+
+/** No key file on disk: tests must not pick up a real `~/.harnessrouter/api-key`. */
+const missingKeyFile: ReadFile = () => {
+  throw Object.assign(new Error("ENOENT: no such file or directory"), { code: "ENOENT" });
+};
+
+function makeAdapter(overrides: Partial<AdapterDependencies> = {}): ReturnType<typeof createHarnessRouterAdapter> {
+  return createHarnessRouterAdapter({ env: {}, readFile: missingKeyFile, ...overrides });
+}
+
+interface Captured {
+  logs: string[];
+  events: AdapterRuntimeEvent[];
+  metas: unknown[];
+}
+
+function makeContext(
+  overrides: Partial<AdapterExecutionContext> & { config?: Record<string, unknown> } = {},
+): { ctx: AdapterExecutionContext; captured: Captured } {
+  const captured: Captured = { logs: [], events: [], metas: [] };
+  const ctx = {
+    runId: "run-1",
+    agent: {
+      id: "agent-1",
+      companyId: "company-1",
+      name: "Sr SWE Backend",
+      adapterType: "harnessrouter",
+      adapterConfig: {},
+    },
+    runtime: { sessionId: null, sessionParams: null, sessionDisplayId: null, taskKey: null },
+    config: {},
+    context: { prompt: "Do the thing" },
+    onLog: async (_stream: "stdout" | "stderr", chunk: string) => {
+      captured.logs.push(chunk);
+    },
+    onEvent: async (event: AdapterRuntimeEvent) => {
+      captured.events.push(event);
+    },
+    onMeta: async (meta: unknown) => {
+      captured.metas.push(meta);
+    },
+    ...overrides,
+  } as unknown as AdapterExecutionContext;
+  return { ctx, captured };
+}
+
+describe("execute", () => {
+  it("runs a task end to end and returns usage and a resumable session", async () => {
+    mock = await startMockUhp({
+      apiKey: "test-key",
+      events: [
+        { type: "response.output_text.delta", delta: "hello " },
+        { type: "response.output_text.delta", delta: "world" },
+      ],
+    });
+
+    const adapter = makeAdapter();
+    const { ctx, captured } = makeContext({
+      config: { baseUrl: mock.baseUrl, apiKey: "test-key", harnessId: "codex" },
+    });
+
+    const result = await adapter.execute(ctx);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.errorMessage).toBeUndefined();
+    expect(captured.logs.join("")).toContain("hello world");
+    expect(result.usage).toEqual({ inputTokens: 12, outputTokens: 34 });
+    expect(result.sessionParams).toMatchObject({
+      harnessrouterResponseId: "resp_1",
+      baseUrl: mock.baseUrl,
+      harnessId: "codex",
+    });
+
+    const post = mock.requests.find((request) => request.method === "POST" && request.path === "/v1/responses");
+    expect(post).toBeDefined();
+    expect(post?.headers["idempotency-key"]).toBe("paperclip-run-1");
+    const body = post?.body as Record<string, unknown>;
+    expect((body.metadata as Record<string, unknown>).harness_id).toBe("codex");
+    expect(body.stream).toBe(true);
+    expect(String(body.input)).toContain("Sr SWE Backend");
+    expect(String(body.input)).toContain("Do the thing");
+  });
+
+  it("reuses a response id from the same server and harness", async () => {
+    mock = await startMockUhp({ apiKey: "test-key" });
+    const adapter = makeAdapter();
+    const { ctx } = makeContext({
+      config: { baseUrl: mock.baseUrl, apiKey: "test-key", harnessId: "codex" },
+      runtime: {
+        sessionId: null,
+        sessionDisplayId: "resp_prev",
+        taskKey: null,
+        sessionParams: {
+          harnessrouterResponseId: "resp_prev",
+          baseUrl: mock.baseUrl,
+          harnessId: "codex",
+        },
+      },
+    });
+
+    await adapter.execute(ctx);
+
+    const post = mock.requests.find((request) => request.method === "POST" && request.path === "/v1/responses");
+    expect((post?.body as Record<string, unknown>).previous_response_id).toBe("resp_prev");
+  });
+
+  it("starts a fresh conversation when the stored id came from another server", async () => {
+    mock = await startMockUhp({ apiKey: "test-key" });
+    const adapter = makeAdapter();
+    const { ctx } = makeContext({
+      config: { baseUrl: mock.baseUrl, apiKey: "test-key", harnessId: "codex" },
+      runtime: {
+        sessionId: null,
+        sessionDisplayId: "resp_prev",
+        taskKey: null,
+        sessionParams: { harnessrouterResponseId: "resp_prev", baseUrl: "http://elsewhere/uhp", harnessId: "codex" },
+      },
+    });
+
+    await adapter.execute(ctx);
+
+    const post = mock.requests.find((request) => request.method === "POST" && request.path === "/v1/responses");
+    expect((post?.body as Record<string, unknown>).previous_response_id).toBeUndefined();
+  });
+
+  it("fails clearly on a rejected key and does not retry it", async () => {
+    mock = await startMockUhp({ apiKey: "test-key" });
+    const adapter = makeAdapter();
+    const { ctx } = makeContext({ config: { baseUrl: mock.baseUrl, apiKey: "wrong-key" } });
+
+    const result = await adapter.execute(ctx);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.errorFamily).toBe("configuration");
+    expect(result.errorCode).toBe("harnessrouter.authentication_error.invalid_credential");
+    expect(mock.requests.filter((request) => request.path === "/v1/responses")).toHaveLength(1);
+  });
+
+  it("classifies a 429 as quota and retries only as far as the client allows", async () => {
+    mock = await startMockUhp({
+      apiKey: "test-key",
+      responsesError: { status: 429, type: "rate_limit_error", code: "rate_limited", message: "slow down" },
+    });
+    const adapter = makeAdapter();
+    const { ctx } = makeContext({
+      config: { baseUrl: mock.baseUrl, apiKey: "test-key", maxRetries: 1 },
+    });
+
+    const result = await adapter.execute(ctx);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.errorFamily).toBe("provider_quota");
+    expect(result.errorCode).toBe("harnessrouter.rate_limit_error.rate_limited");
+    // The attempt plus one retry; a task that never started is safe to try again.
+    expect(mock.requests.filter((request) => request.path === "/v1/responses")).toHaveLength(2);
+  });
+
+  it("classifies a 503 as transient", async () => {
+    mock = await startMockUhp({
+      apiKey: "test-key",
+      responsesError: { status: 503, type: "server_error", code: "unavailable", message: "try later" },
+    });
+    const adapter = makeAdapter();
+    const { ctx } = makeContext({
+      config: { baseUrl: mock.baseUrl, apiKey: "test-key", maxRetries: 0 },
+    });
+
+    const result = await adapter.execute(ctx);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.errorFamily).toBe("transient_upstream");
+  });
+
+  it("refuses to run without a key, and makes no request at all", async () => {
+    mock = await startMockUhp();
+    const adapter = makeAdapter();
+    const { ctx } = makeContext({ config: { baseUrl: mock.baseUrl } });
+
+    const result = await adapter.execute(ctx);
+
+    expect(result.errorCode).toBe("harnessrouter.missing_api_key");
+    expect(result.errorFamily).toBe("configuration");
+    expect(mock.requests).toHaveLength(0);
+  });
+
+  it("reads the API key from a file the operator wrote, without it entering config", async () => {
+    mock = await startMockUhp({ apiKey: "file-key" });
+    const adapter = makeAdapter({
+      readFile: (path) => {
+        expect(path).toBe("/tmp/harnessrouter-key");
+        return "file-key\n";
+      },
+    });
+    const { ctx } = makeContext({ config: { baseUrl: mock.baseUrl, apiKeyFile: "/tmp/harnessrouter-key" } });
+
+    const result = await adapter.execute(ctx);
+
+    expect(result.exitCode).toBe(0);
+    expect(mock.requests.filter((request) => request.path === "/v1/responses")).toHaveLength(1);
+  });
+
+  it("names the key file it looked for when no source has a key", async () => {
+    mock = await startMockUhp();
+    const adapter = makeAdapter();
+    const { ctx } = makeContext({ config: { baseUrl: mock.baseUrl, apiKeyFile: "/tmp/absent-key" } });
+
+    const result = await adapter.execute(ctx);
+
+    expect(result.errorCode).toBe("harnessrouter.missing_api_key");
+    expect(result.errorMessage).toContain("/tmp/absent-key");
+    expect(result.errorMessage).toContain("does not exist");
+    expect(mock.requests).toHaveLength(0);
+  });
+
+  it("reports a malformed base URL as configuration instead of throwing", async () => {
+    const adapter = makeAdapter();
+    const { ctx } = makeContext({ config: { baseUrl: "nonsense", apiKey: "k" } });
+
+    const result = await adapter.execute(ctx);
+
+    expect(result.errorCode).toBe("harnessrouter.config_error");
+    expect(result.errorFamily).toBe("configuration");
+  });
+});
+
+describe("testEnvironment", () => {
+  it("passes when the server answers and the key is accepted", async () => {
+    mock = await startMockUhp({ apiKey: "test-key", harnesses: [{ id: "codex" }, { id: "claude" }] });
+    const adapter = makeAdapter();
+
+    const result = await adapter.testEnvironment({
+      companyId: "company-1",
+      adapterType: "harnessrouter",
+      config: { baseUrl: mock.baseUrl, apiKey: "test-key", harnessId: "codex" },
+    });
+
+    expect(result.status).toBe("pass");
+    expect(result.checks.map((check) => check.code)).toContain("uhp.discovery");
+    expect(result.checks.find((check) => check.code === "uhp.auth")?.message).toContain("2 harnesses");
+  });
+
+  it("reports that the key came from a file, so the operator can see it took effect", async () => {
+    mock = await startMockUhp({ apiKey: "test-key", harnesses: [{ id: "hermes" }] });
+    const adapter = makeAdapter({ readFile: () => "test-key" });
+
+    const result = await adapter.testEnvironment({
+      companyId: "company-1",
+      adapterType: "harnessrouter",
+      config: { baseUrl: mock.baseUrl, apiKeyFile: "/tmp/harnessrouter-key", harnessId: "hermes" },
+    });
+
+    expect(result.status).toBe("pass");
+    const check = result.checks.find((candidate) => candidate.code === "config.api_key");
+    expect(check?.level).toBe("info");
+    expect(check?.message).toContain("/tmp/harnessrouter-key");
+  });
+
+  it("fails when the key is rejected", async () => {
+    mock = await startMockUhp({ apiKey: "test-key" });
+    const adapter = makeAdapter();
+
+    const result = await adapter.testEnvironment({
+      companyId: "company-1",
+      adapterType: "harnessrouter",
+      config: { baseUrl: mock.baseUrl, apiKey: "bad" },
+    });
+
+    expect(result.status).toBe("fail");
+    expect(result.checks.find((check) => check.code === "uhp.auth")?.level).toBe("error");
+  });
+
+  it("fails when the configured harness does not exist", async () => {
+    mock = await startMockUhp({ apiKey: "test-key", harnesses: [{ id: "codex" }] });
+    const adapter = makeAdapter();
+
+    const result = await adapter.testEnvironment({
+      companyId: "company-1",
+      adapterType: "harnessrouter",
+      config: { baseUrl: mock.baseUrl, apiKey: "test-key", harnessId: "ghost" },
+    });
+
+    expect(result.status).toBe("fail");
+    expect(result.checks.find((check) => check.code === "config.harness_id")?.level).toBe("error");
+  });
+
+  it("fails when the server cannot be reached", async () => {
+    const adapter = makeAdapter();
+    const result = await adapter.testEnvironment({
+      companyId: "company-1",
+      adapterType: "harnessrouter",
+      config: { baseUrl: "http://127.0.0.1:1/api/harness", apiKey: "k", maxRetries: 1, timeoutSeconds: 1 },
+    });
+
+    expect(result.status).toBe("fail");
+    expect(result.checks.find((check) => check.code === "uhp.discovery")?.level).toBe("error");
+  });
+});

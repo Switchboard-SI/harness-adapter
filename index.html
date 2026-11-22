@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>@switchboard/harness-adapter — Code-driven agent runs on UHP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ===== Design tokens ===== */
+    :root {
+      --bg: #050608;
+      --surface: rgba(15, 18, 24, 0.55);
+      --surface-2: rgba(20, 24, 32, 0.4);
+      --border: rgba(255, 255, 255, 0.06);
+      --border-hover: rgba(139, 92, 246, 0.45);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #8b5cf6;
+      --accent-2: #06b6d4;
+      --accent-glow: rgba(139, 92, 246, 0.35);
+      --success: #34d399;
+      --radius: 16px;
+      --transition: 600ms cubic-bezier(0.23, 1, 0.32, 1);
+      --transition-fast: 250ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Space Grotesk", system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--accent-2); text-decoration: none; }
+    a:hover { color: var(--text); }
+
+    .container {
+      max-width: 1150px;
+      margin: 0 auto;
+      padding: 0 26px;
+      position: relative;
+      z-index: 10;
+    }
+
+    /* ===== Background ===== */
+    .bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .mesh {
+      position: absolute;
+      inset: 0;
+      opacity: 0.35;
+      background:
+        radial-gradient(circle at 25% 30%, rgba(139, 92, 246, 0.2) 0%, transparent 45%),
+        radial-gradient(circle at 75% 70%, rgba(6, 182, 212, 0.18) 0%, transparent 45%),
+        radial-gradient(circle at 50% 90%, rgba(236, 72, 153, 0.12) 0%, transparent 40%);
+      animation: mesh-shift 24s ease-in-out infinite alternate;
+    }
+
+    @keyframes mesh-shift {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(30px, 50px) scale(1.1); }
+    }
+
+    .grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.4;
+    }
+
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0;
+      animation: blob-float 20s ease-in-out infinite;
+    }
+
+    .blob-1 {
+      top: -8%; left: -6%;
+      width: 700px; height: 700px;
+      background: var(--accent);
+      animation-delay: 0s;
+    }
+
+    .blob-2 {
+      bottom: -8%; right: -6%;
+      width: 600px; height: 600px;
+      background: var(--accent-2);
+      animation-delay: -7s;
+    }
+
+    .blob-3 {
+      top: 45%; left: 50%;
+      width: 500px; height: 500px;
+      background: #ec4899;
+      animation-delay: -14s;
+    }
+
+    @keyframes blob-float {
+      0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.3; }
+      50% { transform: translate(40px, -40px) scale(1.15); opacity: 0.5; }
+    }
+
+    /* ===== Reveal ===== */
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.9s var(--transition), transform 0.9s var(--transition);
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .reveal-d1 { transition-delay: 80ms; }
+    .reveal-d2 { transition-delay: 220ms; }
+    .reveal-d3 { transition-delay: 360ms; }
+    .reveal-d4 { transition-delay: 500ms; }
+    .reveal-d5 { transition-delay: 640ms; }
+
+    /* ===== Nav ===== */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(5, 6, 8, 0.65);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 72px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 1.05rem;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .logo-mark {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 900;
+      font-size: 0.8rem;
+      box-shadow: 0 0 24px var(--accent-glow);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 30px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      font-weight: 500;
+      transition: color var(--transition-fast);
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-decoration: none;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      color: white;
+      box-shadow: 0 0 28px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1.5px);
+      box-shadow: 0 0 40px var(--accent-glow);
+    }
+
+    .btn-outline {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--border-hover);
+      background: rgba(255,255,255,0.04);
+    }
+
+    /* ===== Hero ===== */
+    .hero {
+      padding: 120px 0 90px;
+      position: relative;
+    }
+
+    .hero-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      margin-bottom: 16px;
+      padding: 7px 14px;
+      background: rgba(139, 92, 246, 0.1);
+      border: 1px solid rgba(139, 92, 246, 0.2);
+      border-radius: 8px;
+      animation: pulse-glow 5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.55; border-color: rgba(139, 92, 246, 0.18); }
+      50% { opacity: 0.95; border-color: rgba(139, 92, 246, 0.45); }
+    }
+
+    .hero h1 {
+      font-size: clamp(2.6rem, 5.5vw, 4.2rem);
+      font-weight: 800;
+      line-height: 1.02;
+      letter-spacing: -1.5px;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #fff 0%, #cbd5e1 30%, var(--accent-2) 60%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      font-size: 1.12rem;
+      color: var(--text-muted);
+      max-width: 620px;
+      margin-bottom: 36px;
+      line-height: 1.75;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 70px;
+    }
+
+    .hero-visual {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Terminal card */
+    .terminal-card {
+      width: 100%;
+      max-width: 700px;
+      background: #0b0e13;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 35px 70px -18px rgba(0,0,0,0.7);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: #111827;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .dots { display: flex; gap: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.red { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+    .dot.yellow { background: #f59e0b; box-shadow: 0 0 10px #f59e0b; }
+    .dot.green { background: #22c55e; box-shadow: 0 0 10px #22c55e; }
+
+    .terminal-title {
+      margin-left: auto;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+    }
+
+    .terminal-body {
+      padding: 22px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.82rem;
+      line-height: 1.8;
+      color: #cbd5e1;
+      overflow-x: auto;
+    }
+
+    .cmd-line { margin-bottom: 14px; white-space: pre-wrap; }
+    .cmd-prompt { color: var(--accent-2); margin-right: 9px; font-weight: 800; }
+    .cmd { color: var(--text); }
+    .cmd-arg { color: var(--accent); }
+    .output { color: var(--success); margin-left: 18px; margin-top: 3px; }
+    .output-dim { color: var(--text-muted); }
+    .blink { animation: blink 1.3s step-end infinite; }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ===== Section headers ===== */
+    .section-header {
+      text-align: center;
+      margin-bottom: 70px;
+    }
+
+    .section-header h2 {
+      font-size: clamp(1.9rem, 3.5vw, 2.6rem);
+      font-weight: 800;
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+    }
+
+    .section-header p {
+      color: var(--text-muted);
+      font-size: 1.02rem;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    /* ===== Features ===== */
+    .features {
+      padding: 110px 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 24px;
+    }
+
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      transition: all var(--transition-fast);
+      backdrop-filter: blur(8px);
+    }
+
+    .feature-card:hover {
+      border-color: var(--border-hover);
+      background: rgba(26, 32, 44, 0.6);
+      transform: translateY(-4px);
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+    }
+
+    .feature-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      font-size: 1.2rem;
+      transition: all var(--transition-fast);
+    }
+
+    .feature-card:hover .feature-icon {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border-color: transparent;
+      color: white;
+      transform: rotate(-6deg) scale(1.05);
+    }
+
+    .feature-card h3 {
+      font-size: 1.02rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      letter-spacing: -0.3px;
+    }
+
+    .feature-card p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    /* ===== Flow diagram ===== */
+    .flow-section {
+      padding: 110px 0;
+      background: var(--surface-2);
+      border-top: 1px solid var(--border);
+    }
+
+    .flow-track {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 36px 0;
+      position: relative;
+    }
+
+    .flow-line {
+      position: absolute;
+      top: 50%; left: 0; right: 0;
+      height: 1.5px;
+      background: linear-gradient(90deg, transparent, var(--accent-2), transparent);
+      z-index: 1;
+    }
+
+    .flow-step {
+      position: relative;
+      z-index: 2;
+      flex: 1;
+      text-align: center;
+      padding: 0 14px;
+    }
+
+    .flow-badge {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      color: var(--text-muted);
+      font-family: "JetBrains Mono", monospace;
+      font-weight: 700;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      transition: all var(--transition-fast);
+      box-shadow: 0 16px 32px -12px rgba(0,0,0,0.6);
+    }
+
+    .flow-step:hover .flow-badge {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border-color: transparent;
+      color: white;
+      box-shadow: 0 0 32px var(--accent-glow);
+      transform: scale(1.05);
+    }
+
+    .flow-step h4 {
+      font-size: 0.92rem;
+      font-weight: 700;
+      margin-bottom: 7px;
+    }
+
+    .flow-step p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--accent-2);
+      font-weight: 900;
+      font-size: 1.2rem;
+      opacity: 0.4;
+      transition: opacity var(--transition-fast);
+    }
+
+    .arrow-1 { left: 23%; }
+    .arrow-2 { left: 46%; }
+    .arrow-3 { left: 69%; }
+
+    .flow-step:hover ~ .arrow { opacity: 1; }
+
+    /* ===== Code block ===== */
+    .code-section {
+      padding: 110px 0;
+    }
+
+    .code-wrapper {
+      max-width: 860px;
+      margin: 0 auto;
+      background: #0b0e13;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 35px 70px -18px rgba(0,0,0,0.7);
+    }
+
+    .code-header {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 12px 16px;
+      background: #111827;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .code-tabs { display: flex; gap: 8px; }
+    .tab {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: #1f2937;
+    }
+    .tab.active { background: var(--accent-2); border-color: var(--accent-2); box-shadow: 0 0 14px var(--accent-2); }
+
+    code {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.8rem;
+      line-height: 1.7;
+      color: #cbd5e1;
+      padding: 24px;
+      display: block;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .kw { color: #f87171; }
+    .str { color: #93c5fd; }
+    .fn { color: #c4b5fd; }
+    .com { color: #6b7280; font-style: italic; }
+    .lit { color: #67e8f9; }
+    .prop { color: #fbbf24; }
+    .bool { color: #f87171; }
+
+    /* ===== CTA ===== */
+    .cta {
+      padding: 110px 0;
+      text-align: center;
+    }
+
+    .cta-card {
+      max-width: 660px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 64px 40px;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(20px);
+    }
+
+    .cta-card::before {
+      content: "";
+      position: absolute;
+      top: -35%; left: -35%; width: 170%; height: 170%;
+      background: radial-gradient(circle, rgba(139,92,246,0.07) 0%, transparent 55%);
+      animation: rotate-bg 16s linear infinite;
+      z-index: 0;
+    }
+
+    @keyframes rotate-bg { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .cta-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .cta h2 {
+      font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+      font-weight: 800;
+      margin-bottom: 14px;
+      letter-spacing: -0.5px;
+    }
+
+    .cta p {
+      color: var(--text-muted);
+      margin-bottom: 30px;
+      font-size: 1.05rem;
+    }
+
+    /* ===== Footer ===== */
+    footer {
+      padding: 70px 0 34px;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    .footer-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      align-items: center;
+      text-align: center;
+    }
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 28px;
+      list-style: none;
+    }
+
+    .footer-links a { color: var(--text-muted); font-size: 0.88rem; transition: color var(--transition-fast); }
+    .footer-links a:hover { color: var(--accent-2); }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .hero { padding: 95px 0 70px; }
+      .hero-actions { flex-direction: column; align-items: center; width: 100%; }
+      .hero-actions .btn { width: 100%; justify-content: center; }
+      .features { padding: 85px 0; }
+      .flow-track { flex-wrap: wrap; }
+      .flow-step { flex: 1 1 45%; min-width: 180px; }
+      .arrow { display: none; }
+      .cta-card { padding: 48px 22px; }
+      .terminal-card { max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg">
+    <div class="mesh"></div>
+    <div class="grid"></div>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <nav>
+    <div class="container nav-inner">
+      <a href="#" class="logo">
+        <div class="logo-mark">PA</div>
+        <span>@switchboard/harness-adapter</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#how-it-works">How it works</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#example">Example</a></li>
+        <li><a href="https://github.com/Switchboard-SI/harness-adapter" class="btn btn-outline">GitHub</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="container">
+      <div class="hero-kicker reveal reveal-d1">Open source · Apache-2.0 · Switchboard</div>
+      <h1 class="reveal reveal-d2">Code-driven agent runs on UHP</h1>
+      <p class="reveal reveal-d3">
+        A Paperclip <code style="color: var(--accent-2)">ServerAdapterModule</code> that runs agents on
+        HarnessRouter over the Unified Harness Protocol (UHP). One Paperclip run, one UHP task —
+        conversation continuity, cancellation, usage and error classification, mapped cleanly onto
+        Paperclip's execution contract.
+      </p>
+      <div class="hero-actions reveal reveal-d4">
+        <a href="#how-it-works" class="btn btn-primary">See how it works</a>
+        <a href="https://github.com/Switchboard-SI/harness-adapter" class="btn btn-outline">View on GitHub</a>
+      </div>
+
+      <div class="hero-visual">
+        <div class="terminal-card reveal reveal-d5">
+          <div class="terminal-header">
+            <div class="dots">
+              <div class="dot red"></div>
+              <div class="dot yellow"></div>
+              <div class="dot green"></div>
+            </div>
+            <div class="terminal-title">harness-adapter</div>
+          </div>
+          <div class="terminal-body">
+            <div class="cmd-line reveal reveal-d5"><span class="cmd-prompt">$</span><span class="cmd">npm i</span> <span class="cmd-arg">@switchboard/harness-adapter</span></div>
+            <div class="cmd-line reveal reveal-d6"><span class="cmd-prompt">$</span><span class="cmd">npm run smoke</span> <span class="cmd-arg">-- codex</span></div>
+            <div class="output-dim reveal reveal-d7">✓ testEnvironment: pass</div>
+            <div class="output-dim reveal reveal-d7">✓ UHP discovery: reachable</div>
+            <div class="output-dim reveal reveal-d7">✓ API key accepted; 3 harnesses available</div>
+            <div class="cmd-line reveal reveal-d8">
+              <span class="cmd-prompt">></span> <span class="output">task started · response resp_7f3a</span>
+            </div>
+            <div class="output-dim reveal reveal-d8">usage: { inputTokens: 412, outputTokens: 89 }</div>
+            <div class="cmd-line reveal reveal-d9">
+              <span class="cmd-prompt">_</span><span class="blink">█</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how-it-works" class="flow-section">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>How a run flows</h2>
+        <p>From Paperclip to HarnessRouter and back — every step guaranteed.</p>
+      </div>
+      <div class="flow-track reveal reveal-d1">
+        <div class="flow-line"></div>
+        <div class="flow-step">
+          <div class="flow-badge">1</div>
+          <h4>Paperclip run</h4>
+          <p>Your app submits a run through the adapter contract.</p>
+        </div>
+        <div class="arrow arrow-1">▸</div>
+        <div class="flow-step">
+          <div class="flow-badge">2</div>
+          <h4>UHP task</h4>
+          <p>One run becomes one UHP task on HarnessRouter.</p>
+        </div>
+        <div class="arrow arrow-2">▸</div>
+        <div class="flow-step">
+          <div class="flow-badge">3</div>
+          <h4>Harness executes</h4>
+          <p>Claude Code, Codex, Hermes, Aider, or OpenHands runs it.</p>
+        </div>
+        <div class="arrow arrow-3">▸</div>
+        <div class="flow-step">
+          <div class="flow-badge">4</div>
+          <h4>Stream returns</h4>
+          <p>Usage, cancellation, and errors flow back to Paperclip.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features" class="features">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>What the mapping guarantees</h2>
+        <p>Semantic guarantees the adapter makes at every step of a run.</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card reveal reveal-d1">
+          <div class="feature-icon">✓</div>
+          <h3>Failed request ≠ failed task</h3>
+          <p>A non-2xx response carries a UHP error envelope and is classified. A task that already ran is never retried — and never billed twice.</p>
+        </div>
+        <div class="feature-card reveal reveal-d2">
+          <div class="feature-icon">🔁</div>
+          <h3>Dropped stream recovery</h3>
+          <p>If the SSE connection ends early, the adapter reads the stored response back by id. The stream is an optimisation; the stored response is the truth.</p>
+        </div>
+        <div class="feature-card reveal reveal-d3">
+          <div class="feature-icon">🔗</div>
+          <h3>Conversation continuity</h3>
+          <p>Sessions are response ids. <code>previous_response_id</code> continues the conversation; a mismatched id starts fresh instead of failing.</p>
+        </div>
+        <div class="feature-card reveal reveal-d4">
+          <div class="feature-icon">🔑</div>
+          <h3>Secrets stay out of logs</h3>
+          <p>API keys live in the environment or a <code>chmod 600</code> file. Tool-call arguments are never rendered — only the tool name.</p>
+        </div>
+        <div class="feature-card reveal reveal-d5">
+          <div class="feature-icon">⏱</div>
+          <h3>Smart retries</h3>
+          <p>Retries only happen before the first task event arrives, under a deterministic idempotency key per run.</p>
+        </div>
+        <div class="feature-card reveal reveal-d6">
+          <div class="feature-icon">🧪</div>
+          <h3>testEnvironment()</h3>
+          <p>Three read-only probes at startup: UHP discovery, authenticated harness listing, and harness existence.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="example" class="code-section">
+    <div class="container">
+      <div class="section-header reveal">
+        <h2>Usage example</h2>
+        <p>Register the adapter alongside Paperclip's built-in adapters.</p>
+      </div>
+      <div class="code-wrapper reveal reveal-d1">
+        <div class="code-header">
+          <div class="code-tabs">
+            <div class="tab active"></div>
+            <div class="tab"></div>
+            <div class="tab"></div>
+          </div>
+          <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--text-muted); letter-spacing: 0.06em;">index.ts</span>
+        </div>
+        <code>
+<span class="com">// Register the adapter with Paperclip</span>
+<span class="kw">import</span> adapter <span class="kw">from</span> <span class="str">"@switchboard/harness-adapter"</span>;
+
+<span class="com">// Its `type` is "harnessrouter"</span>
+adapter<span class="fn">.</span><span class="kw">execute</span>(
+  <span class="kw">ctx</span>,
+  <span class="lit">{</span>
+    <span class="prop">baseUrl</span>: <span class="str">"http://127.0.0.1:3200/api/harness"</span>,
+    <span class="prop">apiKeyFile</span>: <span class="str">"~/.harnessrouter/api-key"</span>,
+    <span class="prop">harnessId</span>: <span class="str">"codex"</span>,
+    <span class="prop">timeoutSeconds</span>: <span class="lit">900</span>,
+  <span class="lit">}</span>
+);
+        </code>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="container">
+      <div class="cta-card reveal">
+        <h2>Ready to route agents through HarnessRouter?</h2>
+        <p>Install the adapter, configure your harness, and start running Paperclip tasks on UHP.</p>
+        <a href="https://github.com/Switchboard-SI/harness-adapter" class="btn btn-primary">Get started on GitHub →</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container footer-inner reveal">
+      <div class="footer-logo">
+        <div class="logo-mark">PA</div>
+        <span>@switchboard/harness-adapter</span>
+      </div>
+      <ul class="footer-links">
+        <li><a href="https://github.com/Switchboard-SI/harness-adapter">GitHub</a></li>
+        <li><a href="https://github.com/Switchboard-SI/harness-adapter/issues">Issues</a></li>
+        <li><a href="https://paperclipai.com">Paperclip</a></li>
+        <li><a href="https://github.com/HarnessRouter/harnessrouter">HarnessRouter</a></li>
+      </ul>
+      <p>&copy; 2026 Switchboard. Licensed under Apache-2.0.</p>
+    </div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.7/gsap.min.js"></script>
+  <script>
+    // ===== GSAP Motion Toolchain =====
+    // Integrated with @switchboard/harness-adapter motion config
+    const gsapConfig = {
+      duration: 0.6,
+      ease: "power3.inOut",
+      stagger: 0.12,
+    };
+
+    // Reveal animation with GSAP (replaces CSS-only fade)
+    gsap.from(".reveal", {
+      y: 40,
+      opacity: 0,
+      duration: gsapConfig.duration,
+      ease: gsapConfig.ease,
+      stagger: gsapConfig.stagger,
+      scrollTrigger: {
+        trigger: ".reveal",
+        start: "top 85%",
+        toggleActions: "play none none reverse",
+      },
+    });
+
+    // Terminal typing animation
+    const typeWriter = (element, text, speed = 0.04) => {
+      let i = 0;
+      element.textContent = "";
+      const interval = setInterval(() => {
+        if (i < text.length) {
+          element.textContent += text.charAt(i);
+          i++;
+        } else {
+          clearInterval(interval);
+        }
+      }, speed * 1000);
+    };
+
+    // Animate terminal commands on load
+    window.addEventListener("DOMContentLoaded", () => {
+      const cmdLines = document.querySelectorAll(".cmd");
+      cmdLines.forEach((cmd, idx) => {
+        const text = cmd.textContent;
+        setTimeout(() => typeWriter(cmd, text), idx * 800);
+      });
+    });
+
+    // Feature card hover lift with GSAP
+    document.querySelectorAll(".feature-card").forEach((card) => {
+      card.addEventListener("mouseenter", () => {
+        gsap.to(card, { y: -8, scale: 1.02, duration: 0.3, ease: "power2.out" });
+        const icon = card.querySelector(".feature-icon");
+        gsap.to(icon, { rotate: -10, scale: 1.1, duration: 0.3, ease: "power2.out" });
+      });
+      card.addEventListener("mouseleave", () => {
+        gsap.to(card, { y: 0, scale: 1, duration: 0.3, ease: "power2.out" });
+        const icon = card.querySelector(".feature-icon");
+        gsap.to(icon, { rotate: 0, scale: 1, duration: 0.3, ease: "power2.out" });
+      });
+    });
+
+    // Mouse-reactive parallax on blobs
+    document.addEventListener("mousemove", (e) => {
+      const x = (e.clientX / window.innerWidth - 0.5) * 2;
+      const y = (e.clientY / window.innerHeight - 0.5) * 2;
+      document.querySelectorAll(".blob").forEach((blob, i) => {
+        const speed = (i + 1) * 5;
+        gsap.to(blob, {
+          x: x * speed,
+          y: y * speed,
+          scale: 1 + Math.abs(x) * 0.08,
+          duration: 1,
+          ease: "power2.out",
+        });
+      });
+    });
+  </script>
+</body>
+</html>

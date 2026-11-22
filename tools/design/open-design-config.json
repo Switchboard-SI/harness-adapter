@@ -1,0 +1,7 @@
+{
+  "studioName": "harness-adapter-design-studio",
+  "aiProvider": "openrouter",
+  "defaultModel": "openrouter/nvidia/nemotron-3.5-super-vl:free",
+  "features": ["no-subscription", "ai-design", "component-export"],
+  "outputDir": "./tools/design/output"
+}

@@ -1,0 +1,11 @@
+{
+  "appName": "oh-my-hermes",
+  "endpoints": {
+    "claude": "http://127.0.0.1:3000/api/harness",
+    "codex": "http://127.0.0.1:3000/api/harness",
+    "hermes": "http://127.0.0.1:3000/api/harness",
+    "openhands": "http://127.0.0.1:3000/api/harness"
+  },
+  "acpTools": ["claude", "codex", "hermes", "omh", "OmO", "DSH", "ETC"],
+  "defaultModel": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free"
+}

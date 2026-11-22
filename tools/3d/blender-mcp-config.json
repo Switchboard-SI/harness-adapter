@@ -1,0 +1,6 @@
+{
+  "blenderPath": "/Applications/Blender.app/Contents/MacOS/Blender",
+  "mcpPort": 9876,
+  "pythonScriptsDir": "./tools/3d/blender-scripts",
+  "autoConnect": true
+}

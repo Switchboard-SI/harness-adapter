@@ -1,0 +1,7 @@
+{
+  "baseURL": "http://127.0.0.1:8188",
+  "workflowsDir": "./tools/ai-image/workflows",
+  "modelsDir": "./tools/ai-image/models",
+  "defaultWorkflow": "terminal-preview",
+  "timeoutSeconds": 120
+}

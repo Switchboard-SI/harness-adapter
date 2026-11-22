@@ -1,0 +1,6 @@
+{
+  "h264-high": "-c:v libx264 -crf 18 -preset slow -pix_fmt yuv420p -c:a aac -b:a 192k",
+  "pro-res": "-c:v prores_ks -profile:v 3 -c:a pcm_s24le",
+  "webm-vp9": "-c:v libvpx-vp9 -crf 30 -b:v 0 -c:a libopus",
+  "gif": "-vf 'fps=15,scale=480:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse' -loop 0"
+}

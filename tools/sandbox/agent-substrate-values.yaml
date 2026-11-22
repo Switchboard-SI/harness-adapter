@@ -1,0 +1,15 @@
+replicaCount: 1
+image:
+  repository: agent-substrate/agent-substrate
+  tag: v0.1.0
+resources:
+  limits:
+    cpu: "4"
+    memory: "8Gi"
+  requests:
+    cpu: "2"
+    memory: "4Gi"
+sandbox:
+  zeroTrust: true
+  warmWorkerPods: 8
+  idleTimeout: "5m"
