@@ -6,8 +6,8 @@ to HarnessRouter's Unified Harness Protocol (UHP) and nothing more, so it stays 
 ## Getting started
 
 ```bash
-git clone https://github.com/Switchboard-SI/harnessrouter-paperclip-adapter.git
-cd harnessrouter-paperclip-adapter
+git clone https://github.com/Switchboard-SI/harness-adapter.git
+cd harness-adapter
 npm install
 npm test          # no network or Docker needed
 npm run typecheck

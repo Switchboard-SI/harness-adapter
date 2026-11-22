@@ -1,11 +1,11 @@
-# @switchboard-si/harnessrouter-paperclip-adapter
+# @switchboard/harness-adapter
 
 A Paperclip `ServerAdapterModule` that runs agents on HarnessRouter over UHP.
 
-- **Registry:** https://www.npmjs.com/package/@switchboard-si/harnessrouter-paperclip-adapter
-- **Source:** https://github.com/Switchboard-SI/harnessrouter-paperclip-adapter
-- **Docs:** https://github.com/Switchboard-SI/harnessrouter-paperclip-adapter#readme
-- **Landing page:** https://switchboard-si.github.io/harnessrouter-paperclip-adapter/
+- **Registry:** https://www.npmjs.com/package/@switchboard/harness-adapter
+- **Source:** https://github.com/Switchboard-SI/harness-adapter
+- **Docs:** https://github.com/Switchboard-SI/harness-adapter#readme
+- **Landing page:** https://switchboard-si.github.io/harness-adapter/
 
 ## Overview
 
@@ -21,13 +21,13 @@ Claude Code, Codex, Hermes, Aider, OpenHands — anything HarnessRouter can rout
 ## Installation
 
 ```bash
-npm install @switchboard-si/harnessrouter-paperclip-adapter
+npm install @switchboard/harness-adapter
 ```
 
 ## Quick example
 
 ```ts
-import adapter from "@switchboard-si/harnessrouter-paperclip-adapter";
+import adapter from "@switchboard/harness-adapter";
 
 // Register with Paperclip. The adapter's `type` is "harnessrouter".
 ```

@@ -25,7 +25,7 @@ body:
     attributes:
       label: Adapter version
       description: |
-        What version of `@switchboard-si/harnessrouter-paperclip-adapter` are you using?
+        What version of `@switchboard/harness-adapter` are you using?
       placeholder: "0.1.0"
     validations:
       required: true

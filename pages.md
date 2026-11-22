@@ -8,4 +8,4 @@
 # 2. Build and deployment → Source: Deploy from a branch
 # 3. Branch: `main`, Folder: `/ (root)`
 # 4. Click Save
-# 5. The site will be published at https://switchboard-si.github.io/harnessrouter-paperclip-adapter/
+# 5. The site will be published at https://switchboard-si.github.io/harness-adapter/
