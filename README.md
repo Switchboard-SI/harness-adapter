@@ -30,29 +30,20 @@ execution contract — nothing more, nothing invented.
                  streamed result
 ```
 
-## Quick start
+## Install
 
 ```bash
 npm install @switchboard-si/harnessrouter-paperclip-adapter
 ```
 
-### Requirements
+## Requirements
 
 - Node.js 20+
 - A HarnessRouter Community Edition instance (or any server that passes the UHP conformance suite)
 - A HarnessRouter **CE API key** — created in the console under **API Keys**, not the console
   password and not the model-provider key
 
-### Basic usage
-
-```ts
-import adapter from "@switchboard-si/harnessrouter-paperclip-adapter";
-
-// Register `adapter` alongside Paperclip's built-in adapters.
-// Its `type` is "harnessrouter".
-```
-
-### Configuration
+## Configuration
 
 Pass the config when registering the adapter with Paperclip:
 
@@ -77,7 +68,7 @@ Pass the config when registering the adapter with Paperclip:
 | `maxRetries` | `2` | Retries apply to request failures only, never to a task that already started. |
 | `protocolVersion` | client default | Pinned UHP version to request. Verified against the server in `testEnvironment()`. |
 
-### What the mapping guarantees
+## What the mapping guarantees
 
 - **A failed request is not a failed task.** A non-2xx response carries a UHP error envelope and is
   classified (`configuration`, `provider_quota`, `transient_upstream`). A task that ran and failed
@@ -95,11 +86,36 @@ Pass the config when registering the adapter with Paperclip:
   seen, it never retries on its own — the work may already be underway.
 - **Secrets stay out of logs.** Tool-call arguments are never rendered — only the tool name.
 
-### `testEnvironment()`
+## Using it in Paperclip
+
+```ts
+import adapter from "@switchboard-si/harnessrouter-paperclip-adapter";
+
+// Register `adapter` alongside Paperclip's built-in adapters.
+// Its `type` is "harnessrouter".
+```
+
+## `testEnvironment()`
 
 Performs three probes and never writes anything: unauthenticated UHP discovery, an authenticated
 harness listing, and — when `harnessId` is set — a check that the harness exists. Call it at startup
 to validate configuration before accepting runs.
+
+## Development
+
+```bash
+git clone https://github.com/Switchboard-SI/harnessrouter-paperclip-adapter.git
+cd harnessrouter-paperclip-adapter
+npm install
+npm test        # 55 tests, no network or Docker required
+npm run typecheck
+npm run build   # emits dist/ with type declarations
+```
+
+Tests run the real `harnessrouterjs` client against a small in-process UHP server
+(`test/mock-uhp.ts`), so the HTTP path is exercised rather than stubbed.
+
+CI runs on Node 20, 22 and 24.
 
 ### Live smoke test
 
@@ -123,30 +139,13 @@ Runs discovery, `testEnvironment()`, and one real streamed task.
 | @paperclipai/adapter-utils | `2026.1106.0` |
 | Node.js | `>=20` |
 
-## Development
-
-```bash
-git clone https://github.com/Switchboard-SI/harnessrouter-paperclip-adapter.git
-cd harnessrouter-paperclip-adapter
-npm install
-npm test        # 55 tests, no network or Docker required
-npm run typecheck
-npm run build   # emits dist/ with type declarations
-```
-
-Tests run the real `harnessrouterjs` client against a small in-process UHP server
-(`test/mock-uhp.ts`), so the HTTP path is exercised rather than stubbed.
-
-CI runs on Node 20, 22 and 24.
-
 ## Security
 
 - The API key belongs in the environment, a `chmod 600` file, or Paperclip's config store — never
   in browser code. The adapter never logs the key; diagnostics name only the file it read.
 - Keep the console bound to loopback (`-p 127.0.0.1:3000:3000`). Public deployment needs TLS and a
   reachable console URL; see HarnessRouter's own deployment guide.
-- Report vulnerabilities privately rather than in a public issue:
-  [SECURITY.md](SECURITY.md).
+- Report vulnerabilities privately rather than in a public issue: see [SECURITY.md](SECURITY.md).
 
 ## Contributing
 
